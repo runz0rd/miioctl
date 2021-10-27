@@ -4,8 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
-	"os"
 	"time"
 
 	"github.com/runz0rd/miioctl"
@@ -67,7 +67,7 @@ type Config struct {
 }
 
 func NewConfig(path string) (*Config, error) {
-	f, err := os.ReadFile(path)
+	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

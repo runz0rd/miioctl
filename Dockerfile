@@ -1,7 +1,9 @@
-FROM python:alpine
-WORKDIR /build
-RUN apk add --no-cache gcc libc-dev libffi-dev libressl-dev git make musl-dev go
+FROM python:slim
+RUN apt-get update -y && apt-get install golang -y
 RUN pip3 install python-miio
+
+WORKDIR /build
 COPY . .
 RUN go build -o /miioctl cmd/main.go
-RUN chmod +x /miioctl
+
+ENTRYPOINT ["/miioctl"]
