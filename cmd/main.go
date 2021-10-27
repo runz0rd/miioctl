@@ -5,16 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/runz0rd/miioctl"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
-	var flagIp, flagToken, flagPower string
+	var flagConfig, flagPower string
 	var flagAqi, flagDebug bool
-	flag.StringVar(&flagIp, "ip", "", "ip for miio device")
-	flag.StringVar(&flagToken, "token", "", "token for miio device")
+	flag.StringVar(&flagConfig, "config", "config.yaml", "config file path")
 	flag.StringVar(&flagPower, "power", "", "power on/off/toggle")
 	flag.BoolVar(&flagAqi, "aqi", false, "return current aqi readout")
 	flag.BoolVar(&flagDebug, "debug", false, "debug mode")
@@ -26,14 +27,18 @@ func main() {
 			log.Printf("elapsed %v", time.Since(start))
 		}()
 	}
-	if err := run(flagIp, flagToken, flagAqi, flagPower); err != nil {
+	if err := run(flagConfig, flagAqi, flagPower); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(ip, token string, aqi bool, power string) error {
+func run(config string, aqi bool, power string) error {
+	c, err := NewConfig(config)
+	if err != nil {
+		return err
+	}
 	ctx := context.Background()
-	apctl, err := miio.NewMiioCommand("airpurifiermb4", ip, token)
+	apctl, err := miioctl.NewMiioCommand("airpurifiermb4", c.Ip, c.Token)
 	if err != nil {
 		return err
 	}
@@ -47,11 +52,28 @@ func run(ip, token string, aqi bool, power string) error {
 	}
 
 	if power != "" {
-		pc, err := miio.NewPowerCommand(power)
+		pc, err := miioctl.NewPowerCommand(power)
 		if err != nil {
 			return err
 		}
 		return apctl.Power(ctx, pc)
 	}
 	return nil
+}
+
+type Config struct {
+	Ip    string `yaml:"ip,omitempty"`
+	Token string `yaml:"token,omitempty"`
+}
+
+func NewConfig(path string) (*Config, error) {
+	f, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	c := Config{}
+	if err := yaml.Unmarshal(f, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
