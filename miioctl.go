@@ -13,13 +13,17 @@ type MiioCmd struct {
 	cmd.Cmd
 }
 
-func NewMiioCommand(device, ip, token string) (*MiioCmd, error) {
+func NewMiioCommand(device, ip, token string, debug bool) (*MiioCmd, error) {
 	// check for miiocli
 	_, err := exec.LookPath("miiocli")
 	if err != nil {
 		return nil, err
 	}
-	return &MiioCmd{*cmd.NewCommand("miiocli").Args(device, "--ip", ip, "--token", token)}, nil
+	cmd := cmd.NewCommand("miiocli").Args(device, "--ip", ip, "--token", token)
+	if debug {
+		cmd.Args("--debug")
+	}
+	return &MiioCmd{*cmd}, nil
 }
 
 func (c MiioCmd) Info() *cmd.Cmd {

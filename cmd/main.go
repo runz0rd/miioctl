@@ -38,7 +38,7 @@ func run(config string, aqi bool, power string) error {
 		return err
 	}
 	ctx := context.Background()
-	apctl, err := miioctl.NewMiioCommand("airpurifiermb4", c.Ip, c.Token)
+	apctl, err := miioctl.NewMiioCommand("airpurifiermb4", c.Ip, c.Token, c.Debug)
 	if err != nil {
 		return err
 	}
@@ -64,6 +64,7 @@ func run(config string, aqi bool, power string) error {
 type Config struct {
 	Ip    string `yaml:"ip,omitempty"`
 	Token string `yaml:"token,omitempty"`
+	Debug bool   `yaml:"debug,omitempty"`
 }
 
 func NewConfig(path string) (*Config, error) {
