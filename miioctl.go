@@ -39,24 +39,20 @@ func (c MiioCmd) Status(ctx context.Context) (*Status, error) {
 }
 
 func (c MiioCmd) Power(ctx context.Context, pc PowerCommand) error {
-	status, err := c.Status(ctx)
-	if err != nil {
-		return err
-	}
 	switch pc {
 	case PowerOn:
-		if !status.Powered {
-			if out, err := c.Args("on").Run(ctx); err != nil {
-				return errors.WithMessage(err, out)
-			}
+		if out, err := c.Args("on").Run(ctx); err != nil {
+			return errors.WithMessage(err, out)
 		}
 	case PowerOff:
-		if status.Powered {
-			if out, err := c.Args("off").Run(ctx); err != nil {
-				return errors.WithMessage(err, out)
-			}
+		if out, err := c.Args("off").Run(ctx); err != nil {
+			return errors.WithMessage(err, out)
 		}
 	case PowerToggle:
+		status, err := c.Status(ctx)
+		if err != nil {
+			return err
+		}
 		if status.Powered {
 			if out, err := c.Args("off").Run(ctx); err != nil {
 				return errors.WithMessage(err, out)
