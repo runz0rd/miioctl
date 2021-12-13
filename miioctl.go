@@ -5,48 +5,56 @@ import (
 
 	"os/exec"
 
-	cmd "github.com/foomo/gograpple/exec"
 	"github.com/pkg/errors"
 )
 
 type MiioCmd struct {
-	cmd.Cmd
+	name  string
+	args  []string
+	debug bool
 }
 
-func NewMiioCommand(device, ip, token string, debug bool) (*MiioCmd, error) {
+func NewMiioCmd(device, ip, token string, debug bool) (*MiioCmd, error) {
 	// check for miiocli
 	_, err := exec.LookPath("miiocli")
 	if err != nil {
 		return nil, err
 	}
-	cmd := cmd.NewCommand("miiocli").Args(device, "--ip", ip, "--token", token)
+	c := &MiioCmd{debug: debug}
+	c.name = "miiocli"
 	if debug {
-		cmd.Args("--debug")
+		c.args = append(c.args, "--debug")
 	}
-	return &MiioCmd{*cmd}, nil
+	c.args = append(c.args, device, "--ip", ip, "--token", token)
+
+	return c, nil
 }
 
-func (c MiioCmd) Info() *cmd.Cmd {
-	return c.Args("info")
+func (c MiioCmd) Info(ctx context.Context) *exec.Cmd {
+	c.args = append(c.args, "info")
+	return exec.CommandContext(ctx, c.name, c.args...)
 }
 
 func (c MiioCmd) Status(ctx context.Context) (*Status, error) {
-	out, err := c.Args("status").Run(ctx)
+	c.args = append(c.args, "status")
+	out, err := exec.CommandContext(ctx, c.name, c.args...).CombinedOutput()
 	if err != nil {
-		return nil, errors.WithMessage(err, out)
+		return nil, errors.WithMessage(err, string(out))
 	}
-	return NewStatus(out)
+	return NewStatus(string(out), c.debug)
 }
 
 func (c MiioCmd) Power(ctx context.Context, pc PowerCommand) error {
+	onCmd := exec.CommandContext(ctx, c.name, append(c.args, "on")...)
+	offCmd := exec.CommandContext(ctx, c.name, append(c.args, "off")...)
 	switch pc {
 	case PowerOn:
-		if out, err := c.Args("on").Run(ctx); err != nil {
-			return errors.WithMessage(err, out)
+		if out, err := onCmd.CombinedOutput(); err != nil {
+			return errors.WithMessage(err, string(out))
 		}
 	case PowerOff:
-		if out, err := c.Args("off").Run(ctx); err != nil {
-			return errors.WithMessage(err, out)
+		if out, err := offCmd.CombinedOutput(); err != nil {
+			return errors.WithMessage(err, string(out))
 		}
 	case PowerToggle:
 		status, err := c.Status(ctx)
@@ -54,12 +62,12 @@ func (c MiioCmd) Power(ctx context.Context, pc PowerCommand) error {
 			return err
 		}
 		if status.Powered {
-			if out, err := c.Args("off").Run(ctx); err != nil {
-				return errors.WithMessage(err, out)
+			if out, err := onCmd.CombinedOutput(); err != nil {
+				return errors.WithMessage(err, string(out))
 			}
 		} else {
-			if out, err := c.Args("on").Run(ctx); err != nil {
-				return errors.WithMessage(err, out)
+			if out, err := offCmd.CombinedOutput(); err != nil {
+				return errors.WithMessage(err, string(out))
 			}
 		}
 	}

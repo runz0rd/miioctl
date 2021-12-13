@@ -14,10 +14,24 @@ type Status struct {
 	Speed   int    // rpm
 }
 
-func NewStatus(output string) (*Status, error) {
+const (
+	statusLines      = 11
+	statusDebugLines = 38
+)
+
+func NewStatus(output string, debug bool) (*Status, error) {
 	lines := strings.Split(output, "\n")
-	if len(lines) != 11 {
-		return nil, fmt.Errorf("wrong output format")
+	if debug {
+		if len(lines) != statusDebugLines {
+			return nil, fmt.Errorf("wrong output format")
+		}
+		lines = lines[statusDebugLines-statusLines:]
+	} else {
+		strings.Contains(lines[0], "WARNING")
+		lines = lines[1:]
+		if len(lines) != statusLines {
+			return nil, fmt.Errorf("wrong output format")
+		}
 	}
 	mapping, err := linesToMap(lines, ": ")
 	if err != nil {
