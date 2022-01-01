@@ -1,9 +1,12 @@
 package miioctl
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Status struct {
@@ -16,21 +19,22 @@ type Status struct {
 
 const (
 	statusLines      = 11
-	statusDebugLines = 38
+	statusDebugLines = 37
 )
 
 func NewStatus(output string, debug bool) (*Status, error) {
 	lines := strings.Split(output, "\n")
 	if debug {
 		if len(lines) != statusDebugLines {
-			return nil, fmt.Errorf("wrong output format")
+			spew.Dump(lines)
+			return nil, errors.New("wrong output format")
 		}
 		lines = lines[statusDebugLines-statusLines:]
 	} else {
 		strings.Contains(lines[0], "WARNING")
 		lines = lines[1:]
 		if len(lines) != statusLines {
-			return nil, fmt.Errorf("wrong output format")
+			return nil, errors.New("wrong output format")
 		}
 	}
 	mapping, err := linesToMap(lines, ": ")
