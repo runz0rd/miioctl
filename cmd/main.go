@@ -15,10 +15,13 @@ import (
 func main() {
 	var flagConfig, flagPower string
 	var flagAqi, flagDebug bool
+	var flagMin, flagMax int
 	flag.StringVar(&flagConfig, "config", "config.yaml", "config file path")
 	flag.StringVar(&flagPower, "power", "", "power on/off/toggle")
 	flag.BoolVar(&flagAqi, "aqi", false, "return current aqi readout")
 	flag.BoolVar(&flagDebug, "debug", false, "debug mode")
+	flag.IntVar(&flagMin, "min", 0, "threshold to turn off")
+	flag.IntVar(&flagMax, "max", 0, "threshold to turn on")
 	flag.Parse()
 
 	if flagDebug {
@@ -27,12 +30,12 @@ func main() {
 			log.Printf("elapsed %v", time.Since(start))
 		}()
 	}
-	if err := run(flagConfig, flagAqi, flagPower); err != nil {
+	if err := run(flagConfig, flagAqi, flagPower, flagMin, flagMax); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(config string, aqi bool, power string) error {
+func run(config string, aqi bool, power string, tmin, tmax int) error {
 	c, err := NewConfig(config)
 	if err != nil {
 		return err
@@ -57,6 +60,22 @@ func run(config string, aqi bool, power string) error {
 			return err
 		}
 		return apctl.Power(ctx, pc)
+	}
+
+	if tmin >= tmax {
+		return fmt.Errorf("min must be less than max")
+	}
+	if tmin > 0 || tmax > 0 {
+		status, err := apctl.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if tmax > 0 && status.Aqi >= tmax {
+			return apctl.Power(ctx, miioctl.PowerOn)
+		}
+		if tmin > 0 && status.Aqi <= tmin {
+			return apctl.Power(ctx, miioctl.PowerOff)
+		}
 	}
 	return nil
 }
