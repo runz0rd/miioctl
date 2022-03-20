@@ -1,20 +1,22 @@
 package miioctl
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	log "github.com/sirupsen/logrus"
 )
 
 type Status struct {
-	Powered bool
-	Aqi     int    // μg/m³
-	Mode    string // OperationMode.Favorite
-	Filter  int    // %
-	Speed   int    // rpm
+	Powered bool   `json:"powered,omitempty"`
+	Aqi     int    `json:"aqi,omitempty"`    // μg/m³
+	Mode    string `json:"mode,omitempty"`   // OperationMode.Favorite
+	Filter  int    `json:"filter,omitempty"` // %
+	Speed   int    `json:"speed,omitempty"`  // rpm
 }
 
 const (
@@ -26,7 +28,7 @@ func NewStatus(output string, debug bool) (*Status, error) {
 	lines := strings.Split(output, "\n")
 	if debug {
 		if len(lines) != statusDebugLines {
-			spew.Dump(lines)
+			log.Debug(lines)
 			return nil, errors.New("wrong output format")
 		}
 		lines = lines[statusDebugLines-statusLines:]
@@ -34,6 +36,7 @@ func NewStatus(output string, debug bool) (*Status, error) {
 		strings.Contains(lines[0], "WARNING")
 		lines = lines[1:]
 		if len(lines) != statusLines {
+			log.Debug(lines)
 			return nil, errors.New("wrong output format")
 		}
 	}
@@ -56,6 +59,16 @@ func NewStatus(output string, debug bool) (*Status, error) {
 		return nil, err
 	}
 	return &Status{powered, aqi, mode, filter, speed}, nil
+}
+
+func (s Status) Get(field string) interface{} {
+	if field == "all" {
+		return spew.Sdump(s)
+	}
+	in, _ := json.Marshal(s)
+	var out map[string]interface{}
+	json.Unmarshal(in, &out)
+	return out[field]
 }
 
 func linesToMap(lines []string, delim string) (map[string]string, error) {

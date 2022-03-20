@@ -5,37 +5,42 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
+	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/runz0rd/miioctl"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
 func main() {
-	var flagConfig, flagPower string
-	var flagAqi, flagDebug bool
+	var flagConfig, flagPower, flagStatus, flagServeAddr string
+	var flagDebug bool
 	var flagMin, flagMax int
 	flag.StringVar(&flagConfig, "config", "config.yaml", "config file path")
 	flag.StringVar(&flagPower, "power", "", "power on/off/toggle")
-	flag.BoolVar(&flagAqi, "aqi", false, "return current aqi readout")
+	flag.StringVar(&flagStatus, "status", "", "return current status readout")
+	flag.StringVar(&flagServeAddr, "serve", "", "serve mode addr")
 	flag.BoolVar(&flagDebug, "debug", false, "debug mode")
 	flag.IntVar(&flagMin, "min", 0, "threshold to turn off")
 	flag.IntVar(&flagMax, "max", 0, "threshold to turn on")
 	flag.Parse()
 
 	if flagDebug {
-		start := time.Now()
-		defer func() {
-			log.Printf("elapsed %v", time.Since(start))
-		}()
+		log.SetLevel(log.DebugLevel)
 	}
-	if err := run(flagConfig, flagAqi, flagPower, flagMin, flagMax); err != nil {
+	start := time.Now()
+	defer func() {
+		log.Debugf("elapsed %v", time.Since(start))
+	}()
+
+	if err := run(flagConfig, flagStatus, flagServeAddr, flagPower, flagMin, flagMax); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(config string, aqi bool, power string, tmin, tmax int) error {
+func run(config, status, serveAddr string, power string, tmin, tmax int) error {
 	c, err := NewConfig(config)
 	if err != nil {
 		return err
@@ -45,16 +50,51 @@ func run(config string, aqi bool, power string, tmin, tmax int) error {
 	if err != nil {
 		return err
 	}
-	if aqi {
-		status, err := apctl.Status(ctx)
+	if serveAddr != "" {
+		r := mux.NewRouter()
+		r.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+			s, err := apctl.Status(ctx)
+			if err != nil {
+				w.Write([]byte(fmt.Sprintf("error: %v", err)))
+				return
+			}
+			w.Write([]byte(fmt.Sprint(s.Get("all"))))
+		})
+		r.HandleFunc("/power/{power}", func(w http.ResponseWriter, r *http.Request) {
+			vars := mux.Vars(r)
+			pc, err := miioctl.NewPowerCommand(vars["power"])
+			if err != nil {
+				w.Write([]byte(fmt.Sprintf("error: %v", err)))
+				return
+			}
+			if err := apctl.Power(ctx, pc); err != nil {
+				w.Write([]byte(fmt.Sprintf("error: %v", err)))
+				return
+			}
+		})
+		r.HandleFunc("/on", func(w http.ResponseWriter, r *http.Request) {
+			s, err := apctl.Status(ctx)
+			if err != nil {
+				w.Write([]byte(fmt.Sprintf("error: %v", err)))
+				return
+			}
+			w.Write([]byte(fmt.Sprint(s.Get("all"))))
+		})
+		log.Infof("serving on %v", serveAddr)
+		log.Fatal(http.ListenAndServe(serveAddr, r))
+	}
+	if status != "" {
+		log.Debug("status called")
+		s, err := apctl.Status(ctx)
 		if err != nil {
 			return err
 		}
-		fmt.Print(status.Aqi)
+		fmt.Printf("%v", s.Get(status))
 		return nil
 	}
 
 	if power != "" {
+		log.Debug("power called")
 		pc, err := miioctl.NewPowerCommand(power)
 		if err != nil {
 			return err
@@ -62,10 +102,14 @@ func run(config string, aqi bool, power string, tmin, tmax int) error {
 		return apctl.Power(ctx, pc)
 	}
 
+	if tmin == 0 && tmax == 0 {
+		return nil
+	}
 	if tmin >= tmax {
 		return fmt.Errorf("min must be less than max")
 	}
 	if tmin > 0 || tmax > 0 {
+		log.Debug("tmin or mtax called")
 		status, err := apctl.Status(ctx)
 		if err != nil {
 			return err
