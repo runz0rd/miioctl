@@ -72,14 +72,6 @@ func run(config, status, serveAddr string, power string, tmin, tmax int) error {
 				return
 			}
 		})
-		r.HandleFunc("/on", func(w http.ResponseWriter, r *http.Request) {
-			s, err := apctl.Status(ctx)
-			if err != nil {
-				w.Write([]byte(fmt.Sprintf("error: %v", err)))
-				return
-			}
-			w.Write([]byte(fmt.Sprint(s.Get("all"))))
-		})
 		log.Infof("serving on %v", serveAddr)
 		log.Fatal(http.ListenAndServe(serveAddr, r))
 	}
