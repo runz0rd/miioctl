@@ -1,5 +1,5 @@
-FROM python:slim
-RUN apt-get update -y && apt-get install golang -y
+FROM golang:alpine
+RUN apk add --no-cache python3 py3-pip py3-netifaces gcc g++ make libffi-dev openssl-dev
 RUN pip3 install python-miio
 
 WORKDIR /build
