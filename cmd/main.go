@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/runz0rd/miioctl"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -72,6 +74,8 @@ func run(config, status, serveAddr string, power string, tmin, tmax int) error {
 				return
 			}
 		})
+		gatherer := miioctl.NewStatusGatherer(apctl, prometheus.NewRegistry())
+		r.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 		log.Infof("serving on %v", serveAddr)
 		log.Fatal(http.ListenAndServe(serveAddr, r))
 	}

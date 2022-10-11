@@ -70,6 +70,7 @@ func (s Status) Get(field string) interface{} {
 	return out[field]
 }
 
+
 func linesToMap(lines []string, delim string) (map[string]string, error) {
 	mapping := make(map[string]string)
 	for _, line := range lines {
