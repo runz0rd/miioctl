@@ -6,22 +6,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/version"
 )
 
 var powered = promauto.NewGauge(prometheus.GaugeOpts{
-	Name: "powered",
-	Help: "indicates powered state",
+	Name:      "powered",
+	Namespace: "airpurifiermiot_exporter",
+	Help:      "indicates powered state",
 })
 
 var aqi = promauto.NewGauge(prometheus.GaugeOpts{
-	Name: "aqi",
-	Help: "indicates aqi measurement",
+	Name:      "aqi",
+	Namespace: "airpurifiermiot_exporter",
+	Help:      "indicates aqi measurement",
 })
 
 var filter = promauto.NewGauge(prometheus.GaugeOpts{
-	Name: "filter",
-	Help: "indicates filter state",
+	Name:      "filter",
+	Namespace: "airpurifiermiot_exporter",
+	Help:      "indicates filter state",
 })
 
 type StatusGatherer struct {
@@ -30,7 +32,6 @@ type StatusGatherer struct {
 }
 
 func NewStatusGatherer(miioCmd *MiioCmd, r *prometheus.Registry) *StatusGatherer {
-	r.MustRegister(version.NewCollector("airpurifiermiot_exporter"))
 	r.MustRegister(powered, aqi, filter)
 	return &StatusGatherer{miioCmd, r}
 }
