@@ -46,7 +46,7 @@ func run(config, status, serveAddr string, power string, tmin, tmax int) error {
 		return err
 	}
 	ctx := context.Background()
-	apctl, err := miioctl.NewMiioCmd("airpurifiermb4", c.Ip, c.Token, c.Debug)
+	apctl, err := miioctl.NewMiioCmd("airpurifiermiot", c.Ip, c.Token, c.Debug)
 	if err != nil {
 		return err
 	}

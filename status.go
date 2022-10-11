@@ -20,8 +20,8 @@ type Status struct {
 }
 
 const (
-	statusLines      = 11
-	statusDebugLines = 37
+	statusLines      = 28
+	statusDebugLines = 54
 )
 
 func NewStatus(output string, debug bool) (*Status, error) {
@@ -34,7 +34,6 @@ func NewStatus(output string, debug bool) (*Status, error) {
 		lines = lines[statusDebugLines-statusLines:]
 	} else {
 		strings.Contains(lines[0], "WARNING")
-		lines = lines[1:]
 		if len(lines) != statusLines {
 			log.Debug(lines)
 			return nil, errors.New("wrong output format")
