@@ -45,6 +45,8 @@ func run(config, status, serveAddr string, power string) error {
 		return err
 	}
 	client := miio.New(c.Ip, c.Token)
+	defer client.Close()
+
 	device, err := zhimiairpmb4a.New(client)
 	gatherer := zhimiairpmb4a.NewGatherer(device, prometheus.NewRegistry())
 	if err != nil {
