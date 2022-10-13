@@ -36,6 +36,7 @@ func NewGatherer(d *Device, r *prometheus.Registry) *Gatherer {
 
 func (g *Gatherer) Gather() ([]*dto.MetricFamily, error) {
 	if err := g.d.Query(); err != nil {
+		panic(err)
 		return nil, err
 	}
 	if g.d.IsOn {
