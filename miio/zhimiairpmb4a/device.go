@@ -9,7 +9,7 @@ import (
 
 // https://home.miot-spec.com/spec/zhimi.airp.mb4a
 type Device struct {
-	c                *miio.Client
+	*miio.Client
 	IsOn             bool    `json:"is_on,omitempty"`
 	Fault            string  `json:"fault,omitempty"` // device error
 	Mode             float64 `json:"mode,omitempty"`
@@ -19,8 +19,8 @@ type Device struct {
 	RPM              float64 `json:"rpm,omitempty"`
 }
 
-func New(c *miio.Client) (*Device, error) {
-	dev := &Device{c: c}
+func New(addr, token string) (*Device, error) {
+	dev := &Device{Client: miio.New(addr, token)}
 	if err := dev.Query(); err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (_ Device) DeviceId() string {
 }
 
 func (d *Device) Query() error {
-	resp, err := d.c.GetProperties(
+	resp, err := d.GetProperties(
 		// https://home.miot-spec.com/spec/zhimi.airp.mb4a
 		[]map[string]interface{}{
 			{"siid": 2, "piid": 1},
@@ -80,7 +80,7 @@ func (d *Device) Query() error {
 }
 
 func (d *Device) SetPower(state bool) error {
-	if _, err := d.c.Send("set_properties", []map[string]interface{}{{"siid": 2, "piid": 1, "value": state}}); err != nil {
+	if _, err := d.Send("set_properties", []map[string]interface{}{{"siid": 2, "piid": 1, "value": state}}); err != nil {
 		return err
 	}
 	d.IsOn = state

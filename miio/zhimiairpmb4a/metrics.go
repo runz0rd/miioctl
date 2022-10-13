@@ -4,7 +4,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/runz0rd/miioctl/miio"
 )
 
 var powered = promauto.NewGauge(prometheus.GaugeOpts{
@@ -37,12 +36,12 @@ func NewGatherer(ip, token string, r *prometheus.Registry) *Gatherer {
 }
 
 func (g *Gatherer) Gather() ([]*dto.MetricFamily, error) {
-	client := miio.New(g.ip, g.token)
-	defer client.Close()
-	device, err := New(client)
+	device, err := New(g.ip, g.token)
 	if err != nil {
 		panic(err)
 	}
+	defer device.Close()
+
 	if device.IsOn {
 		powered.Set(1)
 	} else {

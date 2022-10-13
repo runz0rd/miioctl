@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/runz0rd/miioctl/miio"
 	"github.com/runz0rd/miioctl/miio/zhimiairpmb4a"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -59,12 +58,11 @@ func run(config, status, serveAddr string, power string) error {
 		log.Fatal(http.ListenAndServe(serveAddr, r))
 	}
 
-	client := miio.New(c.Ip, c.Token)
-	defer client.Close()
-	device, err := zhimiairpmb4a.New(client)
+	device, err := zhimiairpmb4a.New(c.Ip, c.Token)
 	if err != nil {
 		return err
 	}
+	defer device.Close()
 	if status != "" {
 		log.Debug("status called")
 		fmt.Printf("%v", device.ToString(status))
@@ -106,22 +104,22 @@ func NewConfig(path string) (*Config, error) {
 }
 
 func statusHandler(c *Config, w http.ResponseWriter, r *http.Request) {
-	client := miio.New(c.Ip, c.Token)
-	defer client.Close()
-	device, err := zhimiairpmb4a.New(client)
+	device, err := zhimiairpmb4a.New(c.Ip, c.Token)
 	if err != nil {
 		panic(err)
 	}
+	defer device.Close()
+
 	w.Write([]byte(device.ToString("all")))
 }
 
 func powerHandler(c *Config, w http.ResponseWriter, r *http.Request) {
-	client := miio.New(c.Ip, c.Token)
-	defer client.Close()
-	device, err := zhimiairpmb4a.New(client)
+	device, err := zhimiairpmb4a.New(c.Ip, c.Token)
 	if err != nil {
 		panic(err)
 	}
+	defer device.Close()
+
 	switch mux.Vars(r)["power"] {
 	case "on":
 		err = device.SetPower(true)
