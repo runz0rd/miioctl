@@ -44,48 +44,26 @@ func run(config, status, serveAddr string, power string) error {
 	if err != nil {
 		return err
 	}
-	client := miio.New(c.Ip, c.Token)
-	defer client.Close()
-
-	device, err := zhimiairpmb4a.New(client)
-	gatherer := zhimiairpmb4a.NewGatherer(device, prometheus.NewRegistry())
-	if err != nil {
-		return err
-	}
+	gatherer := zhimiairpmb4a.NewGatherer(c.Ip, c.Token, prometheus.NewRegistry())
 	if serveAddr != "" {
 		r := mux.NewRouter()
 		r.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-			if err := device.Query(); err != nil {
-				w.Write([]byte(fmt.Sprintf("error: %v", err)))
-				return
-			}
-			w.Write([]byte(device.ToString("all")))
+			statusHandler(c, w, r)
 		})
 		r.HandleFunc("/power/{power}", func(w http.ResponseWriter, r *http.Request) {
-			if err := device.Query(); err != nil {
-				w.Write([]byte(fmt.Sprintf("error: %v", err)))
-				return
-			}
-			switch mux.Vars(r)["power"] {
-			case "on":
-				err = device.SetPower(true)
-			case "off":
-				err = device.SetPower(false)
-			case "toggle":
-				err = device.TogglePower()
-			default:
-				w.Write([]byte(fmt.Sprintf("bad param: %v", mux.Vars(r)["power"])))
-				return
-			}
-			if err != nil {
-				w.Write([]byte(fmt.Sprintf("error: %v", err)))
-				return
-			}
+			powerHandler(c, w, r)
 		})
 		r.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 
 		log.Infof("serving on %v", serveAddr)
 		log.Fatal(http.ListenAndServe(serveAddr, r))
+	}
+
+	client := miio.New(c.Ip, c.Token)
+	defer client.Close()
+	device, err := zhimiairpmb4a.New(client)
+	if err != nil {
+		return err
 	}
 	if status != "" {
 		log.Debug("status called")
@@ -125,4 +103,38 @@ func NewConfig(path string) (*Config, error) {
 		return nil, err
 	}
 	return &c, nil
+}
+
+func statusHandler(c *Config, w http.ResponseWriter, r *http.Request) {
+	client := miio.New(c.Ip, c.Token)
+	defer client.Close()
+	device, err := zhimiairpmb4a.New(client)
+	if err != nil {
+		panic(err)
+	}
+	w.Write([]byte(device.ToString("all")))
+}
+
+func powerHandler(c *Config, w http.ResponseWriter, r *http.Request) {
+	client := miio.New(c.Ip, c.Token)
+	defer client.Close()
+	device, err := zhimiairpmb4a.New(client)
+	if err != nil {
+		panic(err)
+	}
+	switch mux.Vars(r)["power"] {
+	case "on":
+		err = device.SetPower(true)
+	case "off":
+		err = device.SetPower(false)
+	case "toggle":
+		err = device.TogglePower()
+	default:
+		w.Write([]byte(fmt.Sprintf("bad param: %v", mux.Vars(r)["power"])))
+		return
+	}
+	if err != nil {
+		w.Write([]byte(fmt.Sprintf("error: %v", err)))
+		return
+	}
 }

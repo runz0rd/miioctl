@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/runz0rd/miioctl/miio"
 )
 
 var powered = promauto.NewGauge(prometheus.GaugeOpts{
@@ -25,26 +26,29 @@ var filter = promauto.NewGauge(prometheus.GaugeOpts{
 })
 
 type Gatherer struct {
-	d *Device
-	r *prometheus.Registry
+	ip    string
+	token string
+	r     *prometheus.Registry
 }
 
-func NewGatherer(d *Device, r *prometheus.Registry) *Gatherer {
+func NewGatherer(ip, token string, r *prometheus.Registry) *Gatherer {
 	r.MustRegister(powered, pm25, filter)
-	return &Gatherer{d, r}
+	return &Gatherer{ip, token, r}
 }
 
 func (g *Gatherer) Gather() ([]*dto.MetricFamily, error) {
-	if err := g.d.Query(); err != nil {
+	client := miio.New(g.ip, g.token)
+	defer client.Close()
+	device, err := New(client)
+	if err != nil {
 		panic(err)
-		return nil, err
 	}
-	if g.d.IsOn {
+	if device.IsOn {
 		powered.Set(1)
 	} else {
 		powered.Set(0)
 	}
-	pm25.Set(g.d.PM25)
-	filter.Set(g.d.FilterUsage)
+	pm25.Set(device.PM25)
+	filter.Set(device.FilterUsage)
 	return g.r.Gather()
 }
