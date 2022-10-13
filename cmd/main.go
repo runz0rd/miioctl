@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -11,7 +10,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/runz0rd/miioctl"
+	"github.com/runz0rd/miioctl/miio"
+	"github.com/runz0rd/miioctl/miio/zhimiairpmb4a"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -19,14 +19,11 @@ import (
 func main() {
 	var flagConfig, flagPower, flagStatus, flagServeAddr string
 	var flagDebug bool
-	var flagMin, flagMax int
 	flag.StringVar(&flagConfig, "config", "config.yaml", "config file path")
 	flag.StringVar(&flagPower, "power", "", "power on/off/toggle")
 	flag.StringVar(&flagStatus, "status", "", "return current status readout")
 	flag.StringVar(&flagServeAddr, "serve", "", "serve mode addr")
 	flag.BoolVar(&flagDebug, "debug", false, "debug mode")
-	flag.IntVar(&flagMin, "min", 0, "threshold to turn off")
-	flag.IntVar(&flagMax, "max", 0, "threshold to turn on")
 	flag.Parse()
 
 	if flagDebug {
@@ -37,84 +34,74 @@ func main() {
 		log.Debugf("elapsed %v", time.Since(start))
 	}()
 
-	if err := run(flagConfig, flagStatus, flagServeAddr, flagPower, flagMin, flagMax); err != nil {
+	if err := run(flagConfig, flagStatus, flagServeAddr, flagPower); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(config, status, serveAddr string, power string, tmin, tmax int) error {
+func run(config, status, serveAddr string, power string) error {
 	c, err := NewConfig(config)
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	apctl, err := miioctl.NewMiioCmd("airpurifiermiot", c.Ip, c.Token, c.Debug)
+	client := miio.New(c.Ip, c.Token)
+	device, err := zhimiairpmb4a.New(client)
+	gatherer := zhimiairpmb4a.NewGatherer(device, prometheus.NewRegistry())
 	if err != nil {
 		return err
 	}
 	if serveAddr != "" {
 		r := mux.NewRouter()
 		r.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-			s, err := apctl.Status(ctx)
-			if err != nil {
+			if err := device.Query(); err != nil {
 				w.Write([]byte(fmt.Sprintf("error: %v", err)))
 				return
 			}
-			w.Write([]byte(fmt.Sprint(s.Get("all"))))
+			w.Write([]byte(device.ToString("all")))
 		})
 		r.HandleFunc("/power/{power}", func(w http.ResponseWriter, r *http.Request) {
-			vars := mux.Vars(r)
-			pc, err := miioctl.NewPowerCommand(vars["power"])
+			if err := device.Query(); err != nil {
+				w.Write([]byte(fmt.Sprintf("error: %v", err)))
+				return
+			}
+			switch mux.Vars(r)["power"] {
+			case "on":
+				err = device.SetPower(true)
+			case "off":
+				err = device.SetPower(false)
+			case "toggle":
+				err = device.TogglePower()
+			default:
+				w.Write([]byte(fmt.Sprintf("bad param: %v", mux.Vars(r)["power"])))
+				return
+			}
 			if err != nil {
 				w.Write([]byte(fmt.Sprintf("error: %v", err)))
 				return
 			}
-			if err := apctl.Power(ctx, pc); err != nil {
-				w.Write([]byte(fmt.Sprintf("error: %v", err)))
-				return
-			}
 		})
-		gatherer := miioctl.NewStatusGatherer(apctl, prometheus.NewRegistry())
 		r.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
+
 		log.Infof("serving on %v", serveAddr)
 		log.Fatal(http.ListenAndServe(serveAddr, r))
 	}
 	if status != "" {
 		log.Debug("status called")
-		s, err := apctl.Status(ctx)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("%v", s.Get(status))
+		fmt.Printf("%v", device.ToString(status))
 		return nil
 	}
 
 	if power != "" {
 		log.Debug("power called")
-		pc, err := miioctl.NewPowerCommand(power)
-		if err != nil {
-			return err
-		}
-		return apctl.Power(ctx, pc)
-	}
-
-	if tmin == 0 && tmax == 0 {
-		return nil
-	}
-	if tmin >= tmax {
-		return fmt.Errorf("min must be less than max")
-	}
-	if tmin > 0 || tmax > 0 {
-		log.Debug("tmin or mtax called")
-		status, err := apctl.Status(ctx)
-		if err != nil {
-			return err
-		}
-		if tmax > 0 && status.Aqi >= tmax {
-			return apctl.Power(ctx, miioctl.PowerOn)
-		}
-		if tmin > 0 && status.Aqi <= tmin {
-			return apctl.Power(ctx, miioctl.PowerOff)
+		switch power {
+		case "on":
+			err = device.SetPower(true)
+		case "off":
+			err = device.SetPower(false)
+		case "toggle":
+			err = device.TogglePower()
+		default:
+			return fmt.Errorf("bad param: %v", power)
 		}
 	}
 	return nil
