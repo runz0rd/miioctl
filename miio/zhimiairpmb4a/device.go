@@ -10,7 +10,7 @@ import (
 // https://home.miot-spec.com/spec/zhimi.airp.mb4a
 type Device struct {
 	*miio.Client
-	IsOn             bool    `json:"is_on,omitempty"`
+	IsOn             bool    `json:"is_on"`
 	Fault            string  `json:"fault,omitempty"` // device error
 	Mode             float64 `json:"mode,omitempty"`
 	PM25             float64 `json:"pm25,omitempty"`         // ug/m3
